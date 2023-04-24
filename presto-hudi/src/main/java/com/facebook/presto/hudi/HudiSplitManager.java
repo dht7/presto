@@ -99,7 +99,9 @@ public class HudiSplitManager
         HudiTableHandle table = layout.getTable();
 
         // Retrieve and prune partitions
-        List<String> partitions = hudiPartitionManager.getEffectivePartitions(session, metastore, table.getSchemaName(), table.getTableName(), layout.getTupleDomain());
+
+        List<String> partitions = hudiPartitionManager.getEffectivePartitions(session, metastore, table.getSchemaTableName(), layout.getTupleDomain());
+
         if (partitions.isEmpty()) {
             return new FixedSplitSource(ImmutableList.of());
         }
