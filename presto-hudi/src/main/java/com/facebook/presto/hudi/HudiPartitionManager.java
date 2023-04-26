@@ -86,13 +86,13 @@ public class HudiPartitionManager
         }
         List<String> partitionNames = metastore.getPartitionNamesByFilter(metastoreContext, schemaTableName.getSchemaName(), schemaTableName.getTableName(), partitionPredicate);
         List<Type> partitionTypes = partitionColumns.stream()
-            .map(column -> typeManager.getType(column.getType().getTypeSignature()))
-            .collect(toList());
+                .map(column -> typeManager.getType(column.getType().getTypeSignature()))
+                .collect(toList());
 
         return partitionNames.stream()
-            // Apply extra filters which could not be done by getPartitionNamesByFilter, similar to filtering in HivePartitionManager#getPartitionsIterator
-            .filter(partitionName -> parseValuesAndFilterPartition(schemaTableName, partitionName, toHiveColumnHandles(hudiColumnHandles), partitionTypes, constraintSummary))
-            .collect(toList());
+                // Apply extra filters which could not be done by getPartitionNamesByFilter, similar to filtering in HivePartitionManager#getPartitionsIterator
+                .filter(partitionName -> parseValuesAndFilterPartition(schemaTableName, partitionName, toHiveColumnHandles(hudiColumnHandles), partitionTypes, constraintSummary, hudiColumnHandles))
+                .collect(toList());
     }
 
     private boolean parseValuesAndFilterPartition(
@@ -100,7 +100,8 @@ public class HudiPartitionManager
             String partitionId,
             List<HiveColumnHandle> partitionColumns,
             List<Type> partitionColumnTypes,
-            TupleDomain<ColumnHandle> constraintSummary)
+            TupleDomain<ColumnHandle> constraintSummary,
+            List<HudiColumnHandle> hudipartitionColumn)
     {
         if (constraintSummary.isNone()) {
             return false;
@@ -108,8 +109,11 @@ public class HudiPartitionManager
 
         Map<ColumnHandle, Domain> domains = constraintSummary.getDomains().orElseGet(ImmutableMap::of);
         HivePartition partition = parsePartition(tableName, partitionId, partitionColumns, partitionColumnTypes, DateTimeZone.forID(TimeZone.getDefault().getID()));
-        for (HiveColumnHandle column : partitionColumns) {
-            NullableValue value = partition.getKeys().get(column);
+        for (HudiColumnHandle column : hudipartitionColumn) {
+
+            HiveColumnHandle hiveColumn = partitionColumns.stream().filter(f -> f.getName().equals(column.getName())).collect(toList()).get(0);
+
+            NullableValue value = partition.getKeys().get(hiveColumn);
             Domain allowedDomain = domains.get(column);
             if (allowedDomain != null && !allowedDomain.includesNullableValue(value.getValue())) {
                 return false;
@@ -122,14 +126,14 @@ public class HudiPartitionManager
     private List<HiveColumnHandle> toHiveColumnHandles(List<HudiColumnHandle> columns)
     {
         return columns.stream()
-            .map(column -> new HiveColumnHandle(
-                column.getName(),
-                column.getHiveType(),
-                column.getHiveType().getTypeSignature(),
-                column.getId(),
-                HiveColumnHandle.ColumnType.PARTITION_KEY,
-                column.getComment(),
-                Optional.empty()))
-            .collect(toList());
+                .map(column -> new HiveColumnHandle(
+                        column.getName(),
+                        column.getHiveType(),
+                        column.getHiveType().getTypeSignature(),
+                        column.getId(),
+                        HiveColumnHandle.ColumnType.PARTITION_KEY,
+                        column.getComment(),
+                        Optional.empty()))
+                .collect(toList());
     }
 }
